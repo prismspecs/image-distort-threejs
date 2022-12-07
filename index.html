@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>My first three.js app</title>
+    <style>
+        body {
+            margin: 0;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- <a href="#" id="saveLink">Save Frame</a> -->
+    <script src="three.js"></script>
+    <script src="ImprovedNoise.js"></script>
+    <script src="ccapture.js"></script>
+    <script>
+
+        const inputImage = "images/matthew-flores.png";
+
+        var strDownloadMime = "image/octet-stream";
+        let width = 1920;
+        let height = 1080;
+
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+
+        const renderer = new THREE.WebGLRenderer({
+            preserveDrawingBuffer: true
+        });
+
+        // renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setSize(width, height);
+        document.body.appendChild(renderer.domElement);
+
+        // capture stuff
+        let isCapturing = false;
+        var capturer = new CCapture({ format: 'jpg', framerate: 60 });
+        let canvas = document.querySelector("canvas");
+
+
+        const Noise = new ImprovedNoise();
+
+        // scene geometry
+        const texture = new THREE.TextureLoader().load(inputImage);
+
+        var planeMat = new THREE.MeshBasicMaterial(
+            {
+                color: 0xffffff,
+                map: texture,
+                // wireframe: true
+            });
+
+        var mesh = new THREE.Mesh(new THREE.PlaneBufferGeometry(178, 100, 17, 10), planeMat);
+        mesh.position.y = 0.0;
+        mesh.position.x = 0.0;
+        mesh.receiveShadow = false;
+        scene.add(mesh);
+
+
+
+        // mouse stuff
+        const useMouse = true;
+
+        const onMouseMove = (event) => {
+            if (useMouse && isCapturing) {
+
+                pointer.x = (event.clientX / window.innerWidth) * 2 - 1;
+                pointer.y = (event.clientY / window.innerHeight) * 2 - 1;
+
+                // console.log("X: " + pointer.x + ", Y: " + pointer.y);
+
+                distortX = pointer.x * 65;
+                distortY = pointer.y * -55;
+
+            }
+        }
+
+        const pointer = new THREE.Vector2();
+        const raycaster = new THREE.Raycaster();
+        window.addEventListener("mousemove", onMouseMove);
+
+        camera.position.z = 75;
+
+        let frameNum = 0;
+        let saveFrames = false;
+
+        let noiseIndex = THREE.MathUtils.randFloat(0, 5);
+        let distortX = 0; // range is -60 to 60 ish
+        let distortXamount = .004;
+        let distortY = 0; // range is -45 to 45 ish
+        let distortYamount = .004;
+
+        function animate() {
+
+            requestAnimationFrame(animate);
+
+            const positionAttribute = mesh.geometry.getAttribute('position');
+
+            const vertex = new THREE.Vector3();
+
+            noiseIndex += .0001;
+
+            if (!useMouse && isCapturing) {
+                distortX = Noise.noise(noiseIndex, 0, 0) * 120;
+                distortY = Noise.noise(0, -noiseIndex, 0) * 120;
+            }
+
+
+            if (isCapturing) {
+
+                distortXamount += .0001;
+                distortYamount += .0001;
+
+                for (let i = 0; i < positionAttribute.count; i++) {
+
+                    vertex.fromBufferAttribute(positionAttribute, i); // read vertex
+
+                    let ns = Noise.noise(vertex.x + noiseIndex, vertex.y + noiseIndex, 0);
+
+                    let xOffset = 0;
+                    let yOffset = 0;
+                    let zOffset = 0;
+
+                    if (vertex.x < distortX) {
+                        xOffset -= distortXamount;
+                    } else {
+                        xOffset += distortXamount;
+                    }
+
+                    if (vertex.y < distortY) {
+                        yOffset -= distortYamount;
+                    } else {
+                        yOffset += distortYamount;
+                    }
+
+                    const v1 = new THREE.Vector2(vertex.x, vertex.y);
+                    const v2 = new THREE.Vector2(distortX, distortY);
+
+                    const d = 50 / v1.distanceTo(v2);
+                    // const d = v1.distanceTo(v2) / 100;
+
+                    xOffset *= d * 1.78;
+                    yOffset *= d * 1;
+
+                    // zOffset = ns * 2;
+
+                    // do something with vertex
+                    positionAttribute.setXYZ(i, vertex.x + xOffset, vertex.y + yOffset, vertex.z + zOffset); // write coordinates back
+
+                }
+
+                mesh.geometry.attributes.position.needsUpdate = true;
+
+            }
+            renderer.render(scene, camera);
+            capturer.capture(canvas);
+
+
+
+        };
+
+        animate();
+
+
+        document.addEventListener("keydown", onDocumentKeyDown, false);
+        function onDocumentKeyDown(event) {
+            var keyCode = event.which;
+
+            console.log("keyCode: " + keyCode);
+
+            if (keyCode == 83) {
+                if (!isCapturing) {
+                    isCapturing = true;
+                    capturer.start();
+                } else {
+                    capturer.stop();
+                    // default save, will download automatically a file called {name}.extension (webm/gif/tar)
+                    capturer.save();
+                    isCapturing = false;
+                }
+
+
+            } else if (keyCode == 65) {
+
+            }
+        };
+
+
+        function pad(num, size) {
+            num = num.toString();
+            while (num.length < size) num = "0" + num;
+            return num;
+        }
+
+
+
+
+    </script>
+</body>
+
+</html>
