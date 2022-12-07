@@ -1,4 +1,4 @@
-# Useage:
+# Usage:
 
 1. edit ```inputImage```
 2. launch it in browser
